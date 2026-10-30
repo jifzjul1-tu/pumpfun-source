@@ -1,5 +1,6 @@
 """Exact instruction edit-distance regressions; no compiler or VM required."""
 import importlib.util
+import itertools
 from pathlib import Path
 import struct
 import unittest
@@ -19,6 +20,25 @@ def tokens(values):
 
 
 class AlignmentDistanceTests(unittest.TestCase):
+    def test_distance_matches_full_grid_for_repeated_short_sequences(self):
+        # Independent full matrix oracle, including empty sequences, repeated
+        # boundary values, asymmetric insertions and competing alignments.
+        sequences = [values for size in range(5)
+                     for values in itertools.product(range(3), repeat=size)]
+        for left in sequences:
+            for right in sequences:
+                grid = [[0] * (len(right) + 1) for _ in range(len(left) + 1)]
+                for i in range(len(left) + 1):
+                    grid[i][0] = i
+                for j in range(len(right) + 1):
+                    grid[0][j] = j
+                for i, a in enumerate(left, 1):
+                    for j, b in enumerate(right, 1):
+                        grid[i][j] = min(grid[i-1][j] + 1, grid[i][j-1] + 1,
+                                         grid[i-1][j-1] + (a != b))
+                self.assertEqual(score.alignment_distance(left, right), grid[-1][-1],
+                                 (left, right))
+
     def test_one_substitution_between_repeated_instructions_costs_one(self):
         self.assertEqual(score.alignment_distance(tokens([0, 0, 0]), tokens([0, 1, 0])), 1)
         self.assertEqual(score.alignment_distance(tokens([0, 1, 0]), tokens([0, 0, 0])), 1)

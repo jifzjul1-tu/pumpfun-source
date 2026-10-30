@@ -924,7 +924,7 @@ from capture import b58
 
 import local_validation
 from compare import compare
-from test_revalidation_output import RevalidationOutputTests
+from test_revalidation_output import RevalidationOutputTests, StandalonePublicationTests
 
 
 

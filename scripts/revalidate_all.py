@@ -8,6 +8,8 @@ Usage:
     python3 scripts/revalidate_all.py --output research/revalidation-audit-20261028
 """
 import argparse
+import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -17,6 +19,7 @@ import subprocess
 import stat
 import sys
 import time
+import uuid
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -314,6 +317,56 @@ if __name__ == "__main__":
     )
     print(f"[revalidate] wrote {len(manifest)+1} files, ~{total_lines:,} lines")
 
+
+def standalone_temporary_sibling(output_dir, label):
+    while True:
+        staging = output_dir.parent / (
+            f".{output_dir.name}.{label}-{os.getpid()}-{uuid.uuid4().hex}")
+        try:
+            staging.mkdir()
+        except FileExistsError:
+            continue
+        return staging
+
+
+def standalone_rename_directory(source, destination):
+    """Publish a directory without replacing a late writer."""
+    if os.name == "nt":
+        source.rename(destination)
+        return
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        rename = getattr(library, "renamex_np", None)
+        args = (os.fsencode(source), os.fsencode(destination), 4)
+        types = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+    elif sys.platform.startswith("linux"):
+        rename = getattr(library, "renameat2", None)
+        args = (-100, os.fsencode(source), -100, os.fsencode(destination), 1)
+        types = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int,
+                 ctypes.c_char_p, ctypes.c_uint]
+    else:
+        rename = None
+    if rename is None:
+        raise OSError(errno.ENOTSUP,
+                      "atomic audit publication unavailable; use a supported host")
+    rename.argtypes = types
+    rename.restype = ctypes.c_int
+    if rename(*args) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), str(destination))
+
+
+def publication_operations():
+    """Use the shared publisher when present and remain copyable otherwise."""
+    try:
+        from deep_disassembly import rename_directory, temporary_sibling
+    except ModuleNotFoundError as error:
+        if error.name != "deep_disassembly":
+            raise
+        return standalone_rename_directory, standalone_temporary_sibling
+    return rename_directory, temporary_sibling
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
@@ -399,7 +452,7 @@ def main():
     print(f"[revalidate] Done: {len(packets)} packets in {elapsed:.0f}s")
     print(f"[revalidate] {pass_count} pass, {fail_count} fail, {skip_count} skip/inconclusive")
 
-    from deep_disassembly import rename_directory, temporary_sibling
+    rename_directory, temporary_sibling = publication_operations()
     staging = temporary_sibling(output_dir, "staging")
     published = False
     try:

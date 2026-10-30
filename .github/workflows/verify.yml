@@ -180,6 +180,7 @@ jobs:
               python -B tests/test_claim_token_incentives_pinned_image.py
               python -B tests/test_pump_admin_token_incentives_pinned_image.py
               python -B tests/test_pump_admin_cto_pinned_image.py
+              python -B tests/test_pump_set_mayhem_virtual_params_pinned_image.py
               python -B -X utf8 tests/test_dispatch_idl_encoding.py
               python -B tests/test_local_validation_idl_encoding.py
               python -B tests/test_claim_token_incentives_idl_encoding.py

@@ -21,6 +21,9 @@ The formula (reverse-engineered empirically from the original and confirmed here
       virtual_quote_reserves = min(raw, cap)
   emit UpdateMayhemVirtualParamsEvent{...}   # always
 """
+if not __debug__:
+    raise SystemExit("Normal Python is required; do not use -O or PYTHONOPTIMIZE.")
+
 import argparse, base64, hashlib, json, struct
 from pathlib import Path
 from solders.account import Account
@@ -30,6 +33,7 @@ from solders.litesvm import LiteSVM
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction
 from solders.transaction_metadata import FailedTransactionMetadata
+from pump_amm_reusable_harness import pin_program
 
 ROOT = Path(__file__).resolve().parents[1]
 PUMP = Pubkey.from_string('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P')
@@ -38,6 +42,8 @@ TOKEN22 = Pubkey.from_string('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb')
 ATA = Pubkey.from_string('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
 ORIGINAL = ROOT / 'evidence/original/pump/deployed.so'
 STUB = ROOT / 'scripts/fixtures/signer_stub.so'
+DEPENDENCIES = {TOKEN22: ROOT / 'evidence/dependencies/spl_token_2022/deployed.so',
+                ATA: ROOT / 'evidence/dependencies/associated_token/deployed.so'}
 BC_DISC = bytes([23, 183, 248, 55, 96, 216, 172, 96])
 SMVP_DISC = bytes([61, 169, 188, 191, 153, 149, 42, 97])
 CAPTURE = next(x for x in json.loads((ROOT / 'research/imported-lab/analysis/pump_fun/config-snapshot.json').read_text())['accounts'] if x['program_name'] == 'pump')
@@ -75,9 +81,9 @@ def mint_acct():
 def run(pump_bin, c):
     vm = LiteSVM().with_transaction_history(0)
     vm.add_program_from_file(PUMP, str(pump_bin))
-    vm.add_program_from_file(MAYHEM, str(STUB))
-    vm.add_program_from_file(TOKEN22, str(ROOT / 'evidence/dependencies/spl_token_2022/deployed.so'))
-    vm.add_program_from_file(ATA, str(ROOT / 'evidence/dependencies/associated_token/deployed.so'))
+    vm.add_program_from_file(MAYHEM, str(pin_program(STUB)))
+    for program, path in DEPENDENCIES.items():
+        vm.add_program_from_file(program, str(pin_program(path)))
     vm.airdrop(PAYER.pubkey(), 10**10)
     g = bytearray(base64.b64decode(CAPTURE['data_base64']))
     g[IRTR_OFF:IRTR_OFF + 8] = struct.pack('<Q', c['irtr'])
@@ -139,19 +145,24 @@ def main():
     p.add_argument('--candidate', type=Path)
     p.add_argument('--output', type=Path)
     a = p.parse_args()
-    assert sha(ORIGINAL.read_bytes()) == '7a19affaa2c6187e04a5fe0ea298cee81fa5eb8c24cfcc30d85f615e89f7b02d'
+    a.candidate = pin_program(a.candidate) if a.candidate else None
+    original = pin_program(ORIGINAL)
+    stub = pin_program(STUB)
+    for path in DEPENDENCIES.values():
+        pin_program(path)
+    assert sha(original.read_bytes()) == '7a19affaa2c6187e04a5fe0ea298cee81fa5eb8c24cfcc30d85f615e89f7b02d'
     rows, bad = [], []
     for i, c in enumerate(cases()):
-        x = run(ORIGINAL, c)
+        x = run(original, c)
         y = run(a.candidate, c) if a.candidate else None
         diff = [k for k in ('err', 'vqr', 'vtr', 'events', 'logs') if y is not None and x.get(k) != y.get(k)]
         rows.append({'i': i, 'case': c, 'original': x, 'candidate': y, 'diff': diff})
         if diff:
             bad.append(i)
     report = {'scope': 'Synthetic-CPI-stub differential of pump set_mayhem_virtual_params; genuine invoke_signed, no bypass. No byte-identity claim.',
-              'original_sha256': sha(ORIGINAL.read_bytes()),
+              'original_sha256': sha(original.read_bytes()),
               'candidate_sha256': sha(a.candidate.read_bytes()) if a.candidate else None,
-              'stub_sha256': sha(STUB.read_bytes()), 'cases': rows, 'mismatches': bad}
+              'stub_sha256': sha(stub.read_bytes()), 'cases': rows, 'mismatches': bad}
     if a.output:
         import gzip
         a.output.write_bytes(gzip.compress(json.dumps(report, indent=2).encode(), mtime=0))

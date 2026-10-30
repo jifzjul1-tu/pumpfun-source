@@ -181,6 +181,19 @@ def alignment_distance(left, right):
     edit script. Keep its visual alignment separate from this ranking metric.
     Use one row of memory, bounded by the shorter instruction sequence.
     """
+    # Equal outer tokens can be matched at zero cost in an optimal edit
+    # script. Only the middle needs the quadratic dynamic-programming grid.
+    start = 0
+    end_left, end_right = len(left), len(right)
+    while start < min(end_left, end_right) and left[start] == right[start]:
+        start += 1
+    while (end_left > start and end_right > start
+           and left[end_left - 1] == right[end_right - 1]):
+        end_left -= 1
+        end_right -= 1
+    left, right = left[start:end_left], right[start:end_right]
+    if not left or not right:
+        return max(len(left), len(right))
     if len(left) < len(right):
         left, right = right, left
     previous = list(range(len(right) + 1))

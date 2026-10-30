@@ -1,6 +1,7 @@
 """Exercise the real rsync staging path without invoking a compiler or SDK."""
 import importlib.util
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile

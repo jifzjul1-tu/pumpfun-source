@@ -36,7 +36,7 @@ def run(script, output, *arguments, environment=None):
 
 
 class PumpFreshOutputOptimizedTests(unittest.TestCase):
-    def check_rejection(self, script, arguments=(), environment=None):
+    def check_rejection(self, script, arguments=(), environment=None, expected_error=ERROR):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "existing-report.json"
             output.write_text("existing report\n")
@@ -44,19 +44,20 @@ class PumpFreshOutputOptimizedTests(unittest.TestCase):
                 script, output, *arguments, environment=environment
             )
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn(ERROR, completed.stderr)
+            self.assertIn(expected_error, completed.stderr)
             self.assertEqual(output.read_text(), "existing report\n")
 
     def test_optimized_python_still_rejects_existing_output(self):
         for script in DIFFERENTIALS:
-            with self.subTest(script=script):
-                self.check_rejection(script, ("-O",))
+            for flag in ("-O", "-OO"):
+                with self.subTest(script=script, flag=flag):
+                    self.check_rejection(script, (flag,), expected_error="Normal Python is required")
 
     def test_pythonoptimize_environment_still_rejects_existing_output(self):
         environment = dict(os.environ, PYTHONOPTIMIZE="1")
         for script in DIFFERENTIALS:
             with self.subTest(script=script):
-                self.check_rejection(script, environment=environment)
+                self.check_rejection(script, environment=environment, expected_error="Normal Python is required")
 
     def test_normal_python_still_rejects_existing_output(self):
         for script in DIFFERENTIALS:
@@ -70,7 +71,7 @@ class PumpFreshOutputOptimizedTests(unittest.TestCase):
             output.symlink_to(Path(directory) / "missing-target.json")
             completed = run(script, output, "-O")
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn(ERROR, completed.stderr)
+            self.assertIn("Normal Python is required", completed.stderr)
             self.assertTrue(output.is_symlink())
 
     def test_output_created_while_cases_run_is_not_replaced(self):

@@ -79,9 +79,20 @@ class PumpDifferentialNormalPythonTests(unittest.TestCase):
                         text=True,
                         timeout=30,
                     )
-                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(result.returncode, 1)
                     self.assertIn("Normal Python is required", result.stderr)
                     self.assertNotIn("ModuleNotFoundError", result.stderr)
+
+    def test_normal_python_reaches_argument_parsers(self):
+        environment = dict(os.environ)
+        environment.pop("PYTHONOPTIMIZE", None)
+        for script in SCRIPTS:
+            with self.subTest(script=script.name):
+                result = subprocess.run([sys.executable, "-B", str(script), "--help"],
+                                        cwd=ROOT, env=environment, capture_output=True,
+                                        text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("usage:", result.stdout)
 
 
 if __name__ == "__main__":

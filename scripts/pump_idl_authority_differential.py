@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Offline Pump IDL-authority reconstruction with normal administrator signatures."""
+if not __debug__:
+    raise SystemExit('Normal Python is required; do not use -O or PYTHONOPTIMIZE.')
 import argparse,base64,gzip,hashlib,json,struct
 from pathlib import Path
 from solders.account import Account

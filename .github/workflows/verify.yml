@@ -107,6 +107,7 @@ jobs:
               python -B tests/test_fees_donation_crank_pinned_image.py
               python -B tests/test_fees_differentials_normal_python.py
               python -B tests/test_amm_differentials_normal_python.py
+              python -B tests/test_pump_differentials_normal_python.py
               python -B tests/test_create_mayhem_normal_python.py
               python -B tests/test_two_curve_optimization_guard.py
               python -O -B tests/test_two_curve_optimization_guard.py

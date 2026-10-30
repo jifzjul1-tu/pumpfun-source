@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Offline original-vs-recovered Pump administrative instruction differential tests."""
+if not __debug__:
+    raise SystemExit('Normal Python is required; do not use -O or PYTHONOPTIMIZE.')
 import argparse, base64, hashlib, json, pathlib
 from solders.account import Account
 from solders.instruction import AccountMeta, Instruction

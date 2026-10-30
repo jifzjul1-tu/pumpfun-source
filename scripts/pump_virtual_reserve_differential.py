@@ -5,6 +5,8 @@ The synthetic caller supplies the required PDA signature in a local VM. This
 is not evidence of a production caller or live reachability. No other program
 is reconstructed or changed, and no transaction is broadcast.
 """
+if not __debug__:
+    raise SystemExit('Normal Python is required; do not use -O or PYTHONOPTIMIZE.')
 import argparse
 import base64
 import gzip

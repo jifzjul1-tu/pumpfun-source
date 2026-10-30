@@ -5,6 +5,8 @@ Token-2022 mint and user ATA. The GlobalVolumeAccumulator schedule and its
 funded canonical incentive ATA are explicit synthetic local fixtures.
 """
 
+if not __debug__:
+    raise SystemExit('Normal Python is required; do not use -O or PYTHONOPTIMIZE.')
 import argparse
 import base64
 import hashlib
